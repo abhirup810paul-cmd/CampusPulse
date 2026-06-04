@@ -1,25 +1,39 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CATEGORIES } from '@/lib/data';
 import { Icon, Button, Logo } from '@/components/ui/core';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleMicrosoftLogin = async () => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    
+    if (!email.endsWith('@iitg.ac.in') && !email.endsWith('@iitg.ernet.in')) {
+      alert("Please use your official IITG email address.");
+      return;
+    }
+
+    setLoading(true);
     const { supabase } = await import('@/lib/supabase');
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'azure',
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
       options: {
-        scopes: 'email profile',
-        redirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/`,
       },
     });
+
+    setLoading(false);
     if (error) {
-      console.error('Error logging in:', error);
-      alert('Failed to log in with Microsoft. Check console for details.');
+      alert(error.message);
+    } else {
+      setSent(true);
     }
   };
 
@@ -66,25 +80,41 @@ export default function LoginScreen() {
         <div style={{ width: "min(380px, 100%)" }}>
           <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Sign in</h2>
           <p style={{ margin: "0 0 26px", fontSize: 14.5, color: "var(--text-2)" }}>
-            Use your IITG Outlook email to securely log in.
+            Use your IITG email to securely log in. No passwords needed.
           </p>
           
-          <button onClick={handleMicrosoftLogin} style={{
-            width: "100%", padding: "12px", borderRadius: "var(--r-md)", border: "1px solid var(--border-strong)",
-            background: "var(--surface)", color: "var(--text)", fontSize: 15, fontWeight: 600,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer",
-            boxShadow: "var(--shadow-sm)", transition: "all .15s"
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
-          onMouseLeave={(e) => e.currentTarget.style.background = "var(--surface)"}>
-            <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-              <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-              <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-              <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
-            </svg>
-            Sign in with Microsoft
-          </button>
+          {sent ? (
+            <div style={{ padding: 24, borderRadius: "var(--r-lg)", background: "color-mix(in srgb, var(--cat-sports) 10%, var(--surface))", border: "1px solid color-mix(in srgb, var(--cat-sports) 30%, var(--border))", textAlign: "center" }}>
+              <Icon name="mail" size={28} style={{ color: "var(--cat-sports)", marginBottom: 12 }} />
+              <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>Check your inbox!</h3>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>
+                We sent a magic login link to <b>{email}</b>. Click the link to sign in.
+              </p>
+              <Button variant="ghost" style={{ marginTop: 16 }} onClick={() => setSent(false)}>Use a different email</Button>
+            </div>
+          ) : (
+            <form onSubmit={handleEmailLogin}>
+              <div style={{ marginBottom: 16 }}>
+                <input 
+                  type="email" 
+                  required 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@iitg.ac.in" 
+                  style={{
+                    width: "100%", padding: "14px 16px", fontSize: 15, color: "var(--text)",
+                    background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
+                    outline: "none", transition: "all .15s", fontFamily: "var(--font-sans)"
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "var(--cat-tech)"}
+                  onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+                />
+              </div>
+              <Button variant="primary" full size="lg" disabled={loading} style={{ position: "relative" }}>
+                {loading ? "Sending link..." : "Send magic link"}
+              </Button>
+            </form>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "22px 0" }}>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
