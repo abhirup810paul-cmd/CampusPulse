@@ -1,93 +1,133 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ExtractedEvent } from '../types';
+/**
+ * CampusPulse AI Ingestion Engine — Core Extraction Function (Groq + Llama 4 Scout)
+ *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │  THIS IS THE MAIN DELIVERABLE                                    │
+ * │                                                                  │
+ * │  A single, self-contained module that takes an ExtractionInput   │
+ * │  (image base64 or URL) and returns a clean ExtractedEvent JSON.  │
+ * │                                                                  │
+ * │  Import and call:                                                │
+ * │    import { extractEvent } from '@/lib/extract';                 │
+ * │    const event = await extractEvent(input);                      │
+ * └──────────────────────────────────────────────────────────────────┘
+ */
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+import Groq from 'groq-sdk';
+import type { ExtractedEvent } from '../types';
+import { buildSystemPrompt, buildUserPrompt } from './prompt';
+import {
+  sanitizeLLMResponse,
+  buildFallbackEvent,
+  validateExtractedEvent,
+} from './helpers';
 
-const SYSTEM_PROMPT = `You are a strict data extraction assistant for CampusPulse, a college event platform.
-Your task is to extract event details from a poster image or a text description and output ONLY a JSON object.
-Do not wrap the JSON in markdown fences (like \`\`\`json) or include any prose.
+// ─── Groq Client Initialization ──────────────────────────────────────────────
 
-Output the JSON matching this exact structure:
-{
-  "title": "string",
-  "description": "string (summarize the key vibe and details, max 3 sentences)",
-  "start_time": "ISO 8601 UTC string, or null",
-  "end_time": "ISO 8601 UTC string, or null",
-  "location": "string (e.g. 'Main Auditorium')",
-  "category": "cultural" | "tech" | "sports" | "academic" | "social",
-  "confidence": "high" | "low",
-  "is_free": boolean,
-  "price": "string or null"
+function getGroqClient() {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey || apiKey === 'your_groq_api_key_here') {
+    throw new Error(
+      '❌ GROQ_API_KEY not found or not set.\n' +
+        '   1. Get your free key from https://console.groq.com/keys\n' +
+        '   2. Paste it into the .env file'
+    );
+  }
+
+  return new Groq({ apiKey });
 }
 
-RULES:
-1. If the date or time is relative ("this Friday"), use the current date to resolve it.
-2. If fields are ambiguous or hard to read, make your best guess but set "confidence": "low".
-3. If the input is completely unreadable or not an event, return all null/empty values and "confidence": "low".
-4. Ensure category strictly matches one of the 5 allowed strings.
-5. All times must be formatted as ISO UTC strings. Assume IST (UTC+5:30) if no timezone is provided.`;
+// ─── Core Extraction Function ────────────────────────────────────────────────
 
-export async function extractEvent(input: { type: 'link' | 'image'; url?: string; image_base64?: string }): Promise<ExtractedEvent> {
-  const currentDate = new Date().toISOString();
-  
+/**
+ * Extracts structured event data from an image or URL using Groq
+ * with Meta's Llama 4 Scout (multimodal vision model).
+ */
+export async function extractEvent(input: {
+  type: 'link' | 'image';
+  url?: string;
+  image_base64?: string;
+  mime_type?: string;
+}): Promise<ExtractedEvent> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: SYSTEM_PROMPT });
-    
-    let promptParts: any[] = [];
-    
-    if (input.type === 'image' && input.image_base64) {
-      const base64Data = input.image_base64.replace(/^data:image\/\w+;base64,/, '');
-      promptParts.push({
-        inlineData: {
-          data: base64Data,
-          mimeType: 'image/jpeg'
-        }
-      });
-      promptParts.push(`Extract event details from this poster. Today is ${currentDate}. Output purely JSON.`);
-    } else if (input.type === 'link' && input.url) {
-      promptParts.push(`Extract event details for the event found at this link: ${input.url}. Today is ${currentDate}. Output purely JSON.`);
+    // ── Validate input ────────────────────────────────────────────────
+    if (input.type === 'image' && !input.image_base64) {
+      return buildFallbackEvent('No image data provided');
+    }
+    if (input.type === 'link' && !input.url) {
+      return buildFallbackEvent('No URL provided');
     }
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: promptParts }],
-      generationConfig: {
-        temperature: 0.1,
-      }
+    // ── Initialize Groq ───────────────────────────────────────────────
+    const groq = getGroqClient();
+    const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildUserPrompt(input.type, input.url);
+
+    const messages: any[] = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+    ];
+
+    if (input.type === 'image' && input.image_base64) {
+      // Vision request: send image as base64 data URI
+      // Strip metadata if present before prepending
+      const base64Data = input.image_base64.replace(/^data:image\/\w+;base64,/, '');
+      const mimeType = input.mime_type || 'image/jpeg';
+      const dataUri = `data:${mimeType};base64,${base64Data}`;
+
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: userPrompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: dataUri,
+            },
+          },
+        ],
+      });
+    } else {
+      // Text-only request: send URL as text context
+      messages.push({
+        role: 'user',
+        content: userPrompt,
+      });
+    }
+
+    // ── Execute API Call ─────────────────────────────────────────────
+    // Using Llama 4 Scout — a multimodal model with vision capabilities
+    // available on Groq's free tier
+    const response = await groq.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: messages,
+      temperature: 0,
+      max_tokens: 1024,
     });
 
-    const textOutput = result.response.text();
-    
-    // Defensive parsing: strip stray markdown fences
-    const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    const parsed = JSON.parse(cleanJson);
-    
-    // Validate shape
-    return {
-      title: parsed.title || '',
-      description: parsed.description || '',
-      start_time: parsed.start_time || null,
-      end_time: parsed.end_time || null,
-      location: parsed.location || '',
-      category: ['cultural', 'tech', 'sports', 'academic', 'social'].includes(parsed.category) ? parsed.category : 'cultural',
-      confidence: parsed.confidence === 'high' ? 'high' : 'low',
-      is_free: !!parsed.is_free,
-      price: parsed.price || null
-    };
+    // ── Extract the response text ─────────────────────────────────────
+    const rawText = response.choices[0]?.message?.content;
 
-  } catch (err) {
-    console.error("Extraction failed:", err);
-    // Graceful fallback
-    return {
-      title: '',
-      description: '',
-      start_time: null,
-      end_time: null,
-      location: '',
-      category: 'cultural',
-      confidence: 'low',
-      is_free: true,
-      price: null
-    };
+    if (!rawText || rawText.trim().length === 0) {
+      return buildFallbackEvent('LLM returned empty response');
+    }
+
+    // ── Parse and validate ────────────────────────────────────────────
+    const sanitized = sanitizeLLMResponse(rawText);
+    const parsed = JSON.parse(sanitized) as Record<string, unknown>;
+    const validated = validateExtractedEvent(parsed);
+
+    return validated;
+  } catch (error) {
+    // ── Defensive fallback — app NEVER crashes ────────────────────────
+    const message =
+      error instanceof Error ? error.message : 'Unknown extraction error';
+
+    console.error(`\n⚠️  Extraction failed: ${message}\n`);
+
+    return buildFallbackEvent(message);
   }
 }
