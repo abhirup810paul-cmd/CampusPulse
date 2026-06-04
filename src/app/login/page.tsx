@@ -7,18 +7,33 @@ import { Icon, Button, Logo } from '@/components/ui/core';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleGithubLogin = async () => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    
+    if (!email.endsWith('@iitg.ac.in') && !email.endsWith('@iitg.ernet.in')) {
+      alert("Please use your official IITG email address.");
+      return;
+    }
+
+    setLoading(true);
     const { supabase } = await import('@/lib/supabase');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
       options: {
-        redirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/`,
       },
     });
 
+    setLoading(false);
     if (error) {
       alert(error.message);
+    } else {
+      setSent(true);
     }
   };
 
@@ -65,22 +80,41 @@ export default function LoginScreen() {
         <div style={{ width: "min(380px, 100%)" }}>
           <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Sign in</h2>
           <p style={{ margin: "0 0 26px", fontSize: 14.5, color: "var(--text-2)" }}>
-            Use your GitHub account to instantly log in.
+            Use your IITG email to securely log in. No passwords needed.
           </p>
           
-          <button onClick={handleGithubLogin} style={{
-            width: "100%", padding: "12px", borderRadius: "var(--r-md)", border: "1px solid var(--border-strong)",
-            background: "var(--surface)", color: "var(--text)", fontSize: 15, fontWeight: 600,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer",
-            boxShadow: "var(--shadow-sm)", transition: "all .15s"
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
-          onMouseLeave={(e) => e.currentTarget.style.background = "var(--surface)"}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-            </svg>
-            Sign in with GitHub
-          </button>
+          {sent ? (
+            <div style={{ padding: 24, borderRadius: "var(--r-lg)", background: "color-mix(in srgb, var(--cat-sports) 10%, var(--surface))", border: "1px solid color-mix(in srgb, var(--cat-sports) 30%, var(--border))", textAlign: "center" }}>
+              <Icon name="mail" size={28} style={{ color: "var(--cat-sports)", marginBottom: 12 }} />
+              <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>Check your inbox!</h3>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>
+                We sent a magic login link to <b>{email}</b>. Click the link to sign in.
+              </p>
+              <Button variant="ghost" style={{ marginTop: 16 }} onClick={() => setSent(false)}>Use a different email</Button>
+            </div>
+          ) : (
+            <form onSubmit={handleEmailLogin}>
+              <div style={{ marginBottom: 16 }}>
+                <input 
+                  type="email" 
+                  required 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@iitg.ac.in" 
+                  style={{
+                    width: "100%", padding: "14px 16px", fontSize: 15, color: "var(--text)",
+                    background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
+                    outline: "none", transition: "all .15s", fontFamily: "var(--font-sans)"
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "var(--cat-tech)"}
+                  onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+                />
+              </div>
+              <Button variant="primary" full size="lg" disabled={loading} style={{ position: "relative" }}>
+                {loading ? "Sending link..." : "Send magic link"}
+              </Button>
+            </form>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "22px 0" }}>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
