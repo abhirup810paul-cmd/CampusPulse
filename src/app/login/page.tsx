@@ -10,6 +10,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
