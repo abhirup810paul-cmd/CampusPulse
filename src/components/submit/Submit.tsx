@@ -43,26 +43,115 @@ export function SubmitScreen() {
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
   const clearConf = (k: string) => setConf((c: any) => { const n = { ...c }; delete n[k]; return n; });
 
-  const runExtraction = () => {
+  const runExtraction = (imgData?: { base64: string; mime: string }) => {
     setPhase("extracting"); setStepIdx(0);
-    let i = 0;
-    const t = setInterval(() => {
-      i++; setStepIdx(i);
-      if (i >= EXTRACT_STEPS.length) {
-        clearInterval(t);
-        setTimeout(() => {
-          const f: any = {}, c: any = {};
-          Object.entries(SAMPLE_EXTRACTION).forEach(([k, o]) => { f[k] = o.v; if (o.c === "low") c[k] = true; });
-          setForm(f); setConf(c); setPhase("review");
-        }, 480);
+    
+    // Animate UI steps
+    let step = 0;
+    const interval = setInterval(() => {
+      step = Math.min(step + 1, EXTRACT_STEPS.length - 1);
+      setStepIdx(step);
+    }, 700);
+
+    // Helper to parse ISO strings to campus local inputs
+    const parseISOTimestamp = (isoString: string | null) => {
+      if (!isoString) return { date: "", time: "" };
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return { date: "", time: "" };
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${min}` };
+      } catch {
+        return { date: "", time: "" };
       }
-    }, 780);
+    };
+
+    // Determine payload
+    let payload: any = null;
+    if (tab === "link") {
+      payload = { type: "link", url: link.trim() };
+    } else if (tab === "upload" && imgData) {
+      payload = { type: "image", image_base64: imgData.base64, mime_type: imgData.mime };
+    }
+
+    if (!payload) {
+      // Fake / sample poster fallback (keeps sample button working instantaneously)
+      setTimeout(() => {
+        clearInterval(interval);
+        const f: any = {}, c: any = {};
+        Object.entries(SAMPLE_EXTRACTION).forEach(([k, o]) => { f[k] = o.v; if (o.c === "low") c[k] = true; });
+        setForm(f); setConf(c); setPhase("review");
+      }, 2500);
+      return;
+    }
+
+    // Call the API
+    fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        clearInterval(interval);
+        if (json.data) {
+          const data = json.data;
+          const { date: startDateStr, time: startTimeStr } = parseISOTimestamp(data.start_time);
+          const { time: endTimeStr } = parseISOTimestamp(data.end_time);
+
+          const f = {
+            title: data.title || "",
+            date: startDateStr,
+            start: startTimeStr,
+            end: endTimeStr,
+            venue: data.location || "",
+            cat: data.category || "cultural",
+            free: typeof data.is_free === "boolean" ? data.is_free : true,
+            price: data.price || "",
+            desc: data.description || "",
+          };
+
+          const c: any = {};
+          if (data.confidence === "low") {
+            c.date = true;
+            c.venue = true;
+            c.cat = true;
+          }
+
+          setForm(f);
+          setConf(c);
+          setPhase("review");
+        } else {
+          throw new Error(json.error || "Extraction failed");
+        }
+      })
+      .catch((err) => {
+        console.error("Extraction error:", err);
+        clearInterval(interval);
+        // Safe degrade: fallback to empty form
+        setForm(blankForm());
+        setConf({});
+        setPhase("review");
+      });
   };
 
   const onFile = (file: File | undefined) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setPoster({ url }); runExtraction();
+    setPoster({ url });
+    
+    // Read file as base64 and extract
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+      runExtraction({ base64: rawBase64, mime: file.type });
+    };
+    reader.readAsDataURL(file);
   };
   const useSample = () => { setPoster(null); runExtraction(); };
   const startManual = () => { setForm(blankForm()); setConf({}); setPhase("review"); };
