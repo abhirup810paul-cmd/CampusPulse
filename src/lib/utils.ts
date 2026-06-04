@@ -58,6 +58,28 @@ export function useInteractions() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
   }, [state]);
 
+  useEffect(() => {
+    const fetchInteractions = async () => {
+      const { supabase } = await import('./supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data } = await supabase.from('user_interactions').select('*').eq('user_id', session.user.id);
+        if (data && data.length > 0) {
+          setState((prev: any) => {
+            const rsvp = { ...prev.rsvp };
+            const stars = { ...prev.stars };
+            data.forEach((row: any) => {
+              if (row.type === 'rsvp') rsvp[row.item_id] = row.value;
+              if (row.type === 'star') stars[row.item_id] = row.value === 'true';
+            });
+            return { rsvp, stars };
+          });
+        }
+      }
+    };
+    fetchInteractions();
+  }, []);
+
   const syncInteraction = async (itemId: string, type: string, value: string | null) => {
     const { supabase } = await import('./supabase');
     const { data: { session } } = await supabase.auth.getSession();

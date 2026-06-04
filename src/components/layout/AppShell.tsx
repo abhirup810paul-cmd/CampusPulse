@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Logo, Icon, Avatar } from '@/components/ui/core';
+import { supabase } from '@/lib/supabase';
 
 const NAV = [
   { key: "/", label: "Calendar", icon: "calendar" },
@@ -16,12 +17,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState('light');
   const [menu, setMenu] = useState(false);
   const [w, setW] = useState(1000);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     setW(window.innerWidth);
     const on = () => setW(window.innerWidth);
     window.addEventListener("resize", on);
     return () => window.removeEventListener("resize", on);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -96,7 +110,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <div style={{ position: "relative" }}>
               <button onClick={() => setMenu((m) => !m)} style={{ border: "none", background: "none", padding: 0, borderRadius: 99 }}>
-                <Avatar person={{ name: 'You Student', initials: 'YS', hue: 200 }} size={34} ring="var(--surface)" />
+                {user ? (
+                  <Avatar person={{ name: user.email.split('@')[0], initials: user.email.substring(0, 2).toUpperCase(), hue: 200 }} size={34} ring="var(--surface)" />
+                ) : (
+                  <Avatar person={{ name: 'Guest', initials: 'GU', hue: 0 }} size={34} ring="var(--surface)" />
+                )}
               </button>
               {menu && (
                 <React.Fragment>
@@ -106,12 +124,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r-md)",
                     boxShadow: "var(--shadow-lg)", animation: "cp-pop .16s ease"
                   }}>
-                    <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>You Student</div>
-                      <div style={{ fontSize: 12, color: "var(--text-3)" }}>you@iitg.ac.in</div>
-                    </div>
+                    {user ? (
+                      <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700 }}>{user.email.split('@')[0]}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-3)", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700 }}>Guest User</div>
+                        <div style={{ fontSize: 12, color: "var(--text-3)" }}>Not signed in</div>
+                      </div>
+                    )}
                     <MenuItem icon="moon" label="Toggle theme" onClick={() => { setThemeState(theme === "dark" ? "light" : "dark"); setMenu(false); }} />
-                    <MenuItem icon="arrowR" label="Sign out" onClick={() => { setMenu(false); router.push('/login'); }} />
+                    {user ? (
+                      <MenuItem icon="arrowR" label="Sign out" onClick={async () => { await supabase.auth.signOut(); setMenu(false); }} />
+                    ) : (
+                      <MenuItem icon="user" label="Sign in" onClick={() => { setMenu(false); router.push('/login'); }} />
+                    )}
                   </div>
                 </React.Fragment>
               )}
