@@ -8,12 +8,12 @@ import { Icon, Button, Logo } from '@/components/ui/core';
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
     
     if (!email.endsWith('@iitg.ac.in') && !email.endsWith('@iitg.ernet.in')) {
       alert("Please use your official IITG email address.");
@@ -22,18 +22,22 @@ export default function LoginScreen() {
 
     setLoading(true);
     const { supabase } = await import('@/lib/supabase');
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    });
+    
+    let error;
+    if (isSignUp) {
+      const res = await supabase.auth.signUp({ email, password });
+      error = res.error;
+    } else {
+      const res = await supabase.auth.signInWithPassword({ email, password });
+      error = res.error;
+    }
 
     setLoading(false);
     if (error) {
       alert(error.message);
     } else {
-      setSent(true);
+      router.push('/');
+      router.refresh();
     }
   };
 
@@ -78,43 +82,53 @@ export default function LoginScreen() {
       {/* form panel */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}>
         <div style={{ width: "min(380px, 100%)" }}>
-          <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Sign in</h2>
+          <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>{isSignUp ? "Create Account" : "Sign in"}</h2>
           <p style={{ margin: "0 0 26px", fontSize: 14.5, color: "var(--text-2)" }}>
-            Use your IITG email to securely log in. No passwords needed.
+            Use your IITG email to securely log in.
           </p>
           
-          {sent ? (
-            <div style={{ padding: 24, borderRadius: "var(--r-lg)", background: "color-mix(in srgb, var(--cat-sports) 10%, var(--surface))", border: "1px solid color-mix(in srgb, var(--cat-sports) 30%, var(--border))", textAlign: "center" }}>
-              <Icon name="mail" size={28} style={{ color: "var(--cat-sports)", marginBottom: 12 }} />
-              <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>Check your inbox!</h3>
-              <p style={{ margin: 0, fontSize: 14, color: "var(--text-2)", lineHeight: 1.5 }}>
-                We sent a magic login link to <b>{email}</b>. Click the link to sign in.
-              </p>
-              <Button variant="ghost" style={{ marginTop: 16 }} onClick={() => setSent(false)}>Use a different email</Button>
+          <form onSubmit={handleEmailLogin}>
+            <div style={{ marginBottom: 12 }}>
+              <input 
+                type="email" 
+                required 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@iitg.ac.in" 
+                style={{
+                  width: "100%", padding: "14px 16px", fontSize: 15, color: "var(--text)",
+                  background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
+                  outline: "none", transition: "all .15s", fontFamily: "var(--font-sans)"
+                }}
+                onFocus={(e) => e.target.style.borderColor = "var(--cat-tech)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
             </div>
-          ) : (
-            <form onSubmit={handleEmailLogin}>
-              <div style={{ marginBottom: 16 }}>
-                <input 
-                  type="email" 
-                  required 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@iitg.ac.in" 
-                  style={{
-                    width: "100%", padding: "14px 16px", fontSize: 15, color: "var(--text)",
-                    background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
-                    outline: "none", transition: "all .15s", fontFamily: "var(--font-sans)"
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = "var(--cat-tech)"}
-                  onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
-                />
-              </div>
-              <Button variant="primary" full size="lg" disabled={loading} style={{ position: "relative" }}>
-                {loading ? "Sending link..." : "Send magic link"}
-              </Button>
-            </form>
-          )}
+            <div style={{ marginBottom: 16 }}>
+              <input 
+                type="password" 
+                required 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password" 
+                style={{
+                  width: "100%", padding: "14px 16px", fontSize: 15, color: "var(--text)",
+                  background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
+                  outline: "none", transition: "all .15s", fontFamily: "var(--font-sans)"
+                }}
+                onFocus={(e) => e.target.style.borderColor = "var(--cat-tech)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
+            </div>
+            <Button variant="primary" full size="lg" disabled={loading} style={{ position: "relative", marginBottom: 12 }}>
+              {loading ? "Processing..." : (isSignUp ? "Create Account" : "Sign In")}
+            </Button>
+            <div style={{ textAlign: "center" }}>
+              <button type="button" onClick={() => setIsSignUp(!isSignUp)} style={{ background: "none", border: "none", fontSize: 13, color: "var(--cat-tech)", cursor: "pointer", fontWeight: 600 }}>
+                {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+              </button>
+            </div>
+          </form>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "22px 0" }}>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
