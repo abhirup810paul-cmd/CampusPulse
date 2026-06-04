@@ -1,28 +1,31 @@
+// ── Single source of truth for all CampusPulse types ──
+
 export type Category = 'cultural' | 'tech' | 'sports' | 'academic' | 'social';
-export type Source = 'official' | 'community';
-export type Status = 'published' | 'community';
+export type Source = 'official' | 'club' | 'community';
 export type RSVPStatus = 'going' | 'interested' | 'not_going';
 
+/** Matches the Supabase `events` table columns exactly */
 export interface Event {
   id: string;
   title: string;
+  date: string;          // YYYY-MM-DD
+  start: string;         // HH:mm
+  end: string;           // HH:mm
+  venue: string;
   description: string;
-  start_time: string | null;
-  end_time: string | null;
-  location: string;
-  category: Category;
+  cat: Category;
   source: Source;
-  status: Status;
-  is_free: boolean;
+  free: boolean;
   price: string | null;
+  going: number;
+  interested: number;
+  stars: number;
+  host: string | null;
   poster_url: string | null;
   created_at: string;
-  view_count: number;
-  star_count: number;
-  rsvp_going_count: number;
-  submitter_id: string | null;
 }
 
+/** Output from the AI extraction pipeline */
 export interface ExtractedEvent {
   title: string;
   description: string;
@@ -36,9 +39,9 @@ export interface ExtractedEvent {
 }
 
 export const CATEGORY_COLORS: Record<Category, string> = {
-  cultural: '#EC4899', // pink-500
-  tech: '#3B82F6',     // blue-500
-  sports: '#10B981',   // emerald-500
-  academic: '#8B5CF6', // violet-500
-  social: '#F59E0B'    // amber-500
+  cultural: '#EC4899',
+  tech: '#3B82F6',
+  sports: '#10B981',
+  academic: '#8B5CF6',
+  social: '#F59E0B',
 };

@@ -39,7 +39,6 @@ export function avatars(n: number, seed = 0) {
   return out;
 }
 
-const d = (day: number) => `2026-09-${String(day).padStart(2, "0")}`;
 
 import { supabase } from './supabase';
 
