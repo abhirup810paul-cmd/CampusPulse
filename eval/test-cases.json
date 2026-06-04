@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Mock Hackathon Instagram Post",
+    "link": "https://instagram.com/p/mock-hackathon",
+    "expected": {
+      "title": "Hackathon 2026 Kickoff",
+      "category": "tech",
+      "is_free": true
+    }
+  },
+  {
+    "name": "Mock Music Night Post",
+    "link": "https://club.com/music-night",
+    "expected": {
+      "title": "Inter-Hostel Music Night",
+      "category": "cultural",
+      "is_free": false
+    }
+  }
+]

@@ -1,0 +1,130 @@
+/* ============================================================
+   CampusPulse — design tokens
+   Type: Space Grotesk (display) · Plus Jakarta Sans (UI/body) · JetBrains Mono (labels)
+   Base: neutral slate. Color comes from the 7 event categories.
+   ============================================================ */
+
+:root {
+  /* type */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /* radius / shape */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-pill: 999px;
+
+  /* accent intensity (driven by Tweaks 0..1.4) */
+  --ai: 1;
+
+  /* category accents — EXACT brief values */
+  --cat-tech: #3b82f6;
+  --cat-cultural: #a855f7;
+  --cat-sports: #22c55e;
+  --cat-academic: #f59e0b;
+  --cat-social: #ec4899;
+  --cat-personal: #64748b;
+  --cat-merch: #ef4444;
+  --cat-trending: #fb923c;
+
+  /* light theme (default) */
+  --bg: #f4f6f9;
+  --bg-grad: radial-gradient(1200px 700px at 78% -8%, #eef1f7 0%, #f4f6f9 55%);
+  --surface: #ffffff;
+  --surface-2: #f1f4f8;
+  --surface-3: #e9edf3;
+  --border: #e3e8ef;
+  --border-strong: #cdd5e0;
+  --text: #0d1424;
+  --text-2: #51607a;
+  --text-3: #8a97ac;
+  --ring: color-mix(in srgb, var(--cat-tech) 55%, transparent);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06), 0 1px 1px rgba(15, 23, 42, .04);
+  --shadow-md: 0 4px 14px -4px rgba(15, 23, 42, .12), 0 2px 6px -2px rgba(15, 23, 42, .08);
+  --shadow-lg: 0 24px 60px -18px rgba(15, 23, 42, .28), 0 10px 24px -12px rgba(15, 23, 42, .16);
+  --scrim: rgba(13, 20, 36, .42);
+}
+
+[data-theme="dark"] {
+  --bg: #05070d;
+  --bg-grad: radial-gradient(1200px 700px at 78% -8%, #0d1322 0%, #05070d 58%);
+  --surface: #0e1422;
+  --surface-2: #151d2e;
+  --surface-3: #1d2738;
+  --border: #222d42;
+  --border-strong: #32405a;
+  --text: #eef2f8;
+  --text-2: #9aa7bd;
+  --text-3: #647288;
+  --ring: color-mix(in srgb, var(--cat-tech) 65%, transparent);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .5);
+  --shadow-md: 0 6px 20px -6px rgba(0, 0, 0, .6);
+  --shadow-lg: 0 30px 70px -20px rgba(0, 0, 0, .8), 0 12px 28px -14px rgba(0, 0, 0, .6);
+  --scrim: rgba(2, 4, 9, .66);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.01em;
+}
+#root { height: 100%; }
+
+h1, h2, h3, h4, .display { font-family: var(--font-display); letter-spacing: -0.025em; }
+.mono { font-family: var(--font-mono); }
+
+::selection { background: color-mix(in srgb, var(--cat-tech) 30%, transparent); }
+
+/* ---- category helper: set --c, --c-soft, --c-ink, --c-line from a category ---- */
+.cat { --c: var(--cat-personal); }
+.cat-tech     { --c: var(--cat-tech); }
+.cat-cultural { --c: var(--cat-cultural); }
+.cat-sports   { --c: var(--cat-sports); }
+.cat-academic { --c: var(--cat-academic); }
+.cat-social   { --c: var(--cat-social); }
+.cat-personal { --c: var(--cat-personal); }
+.cat-merch    { --c: var(--cat-merch); }
+.cat-trending { --c: var(--cat-trending); }
+
+/* theme-adaptive derived tones (used everywhere for chips/badges) */
+.cat,
+[class*="cat-"] {
+  --c-soft: color-mix(in srgb, var(--c) calc(16% * var(--ai)), var(--surface));
+  --c-soft-2: color-mix(in srgb, var(--c) calc(26% * var(--ai)), var(--surface));
+  --c-ink: color-mix(in srgb, var(--c), var(--text) 26%);
+  --c-line: color-mix(in srgb, var(--c) calc(38% * var(--ai)), var(--border));
+}
+
+/* scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
+
+/* utility */
+.elevate { box-shadow: var(--shadow-md); }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+a { color: inherit; }
+
+@keyframes cp-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes cp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cp-pop { 0% { opacity: 0; transform: scale(.96) translateY(8px); } 100% { opacity: 1; transform: none; } }
+
+/* Ensure all animations stay at end-state; prevents opacity:0 freeze on backgrounded tabs */
+*, *::before, *::after { animation-fill-mode: both; }
+@keyframes cp-spin { to { transform: rotate(360deg); } }
+@keyframes cp-pulse-ring { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes cp-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes cp-beat { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
+@keyframes cp-check { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }

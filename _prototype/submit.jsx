@@ -1,0 +1,236 @@
+/* ============================================================
+   CampusPulse — Submit Event flow
+   Tabs: Paste link · Upload poster · Manual
+   Signature moment: AI extraction auto-fills the form.
+   ============================================================ */
+
+const EXTRACT_STEPS = [
+  { icon: "image", label: "Reading the poster" },
+  { icon: "sparkles", label: "Pulling out title & description" },
+  { icon: "calendar", label: "Finding date & time" },
+  { icon: "pin", label: "Detecting venue & category" },
+];
+
+// what the "AI" returns — values + per-field confidence
+const SAMPLE_EXTRACTION = {
+  title: { v: "Crescendo — Inter-Hostel Music Night", c: "high" },
+  date: { v: "2026-09-27", c: "low" },
+  start: { v: "19:00", c: "high" },
+  end: { v: "22:30", c: "high" },
+  venue: { v: "Dr. Bhupen Hazarika Auditorium", c: "low" },
+  cat: { v: "cultural", c: "high" },
+  free: { v: false, c: "high" },
+  price: { v: "₹120", c: "low" },
+  desc: { v: "A night of live sets as hostels battle it out across genres — acoustic, rock, indie and fusion. Open to all; doors at 6:30 PM. Outside food not allowed.", c: "high" },
+};
+
+function blankForm() {
+  return { title: "", date: "", start: "", end: "", venue: "", cat: "", free: true, price: "", desc: "" };
+}
+
+function SubmitScreen({ onPublish, onCancel }) {
+  const [tab, setTab] = React.useState("upload");
+  const [phase, setPhase] = React.useState("idle"); // idle | extracting | review | done
+  const [stepIdx, setStepIdx] = React.useState(0);
+  const [form, setForm] = React.useState(blankForm());
+  const [conf, setConf] = React.useState({}); // field -> 'low'
+  const [poster, setPoster] = React.useState(null); // {url} or null (sample)
+  const [link, setLink] = React.useState("");
+  const fileRef = React.useRef();
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const clearConf = (k) => setConf((c) => { const n = { ...c }; delete n[k]; return n; });
+
+  const runExtraction = () => {
+    setPhase("extracting"); setStepIdx(0);
+    let i = 0;
+    const t = setInterval(() => {
+      i++; setStepIdx(i);
+      if (i >= EXTRACT_STEPS.length) {
+        clearInterval(t);
+        setTimeout(() => {
+          const f = {}, c = {};
+          Object.entries(SAMPLE_EXTRACTION).forEach(([k, o]) => { f[k] = o.v; if (o.c === "low") c[k] = true; });
+          setForm(f); setConf(c); setPhase("review");
+        }, 480);
+      }
+    }, 780);
+  };
+
+  const onFile = (file) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPoster({ url }); runExtraction();
+  };
+  const useSample = () => { setPoster(null); runExtraction(); };
+  const startManual = () => { setForm(blankForm()); setConf({}); setPhase("review"); };
+
+  const switchTab = (t) => {
+    setTab(t); setPhase("idle"); setForm(blankForm()); setConf({}); setPoster(null); setLink("");
+    if (t === "manual") startManual();
+  };
+
+  const lowCount = Object.keys(conf).length;
+
+  return (
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "8px 4px 40px" }}>
+      <div style={{ marginBottom: 22 }}>
+        <h1 style={{ margin: "0 0 6px", fontSize: 30, fontWeight: 700 }}>Submit an event</h1>
+        <p style={{ margin: 0, fontSize: 15, color: "var(--text-2)" }}>
+          Drop a poster and let CampusPulse fill in the details — or add them yourself.
+        </p>
+      </div>
+
+      <div style={{ maxWidth: 460, marginBottom: 22 }}>
+        <Tabs value={tab} onChange={switchTab} tabs={[
+          { value: "link", label: "Paste link", icon: "link" },
+          { value: "upload", label: "Upload poster", icon: "upload" },
+          { value: "manual", label: "Manual", icon: "edit" },
+        ]} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: phase === "review" || phase === "done" ? "minmax(0,360px) 1fr" : "1fr",
+        gap: 24, alignItems: "start" }}>
+        {/* INPUT / POSTER PANE */}
+        {(tab !== "manual") && (
+          <div style={{ position: "sticky", top: 8 }}>
+            <InputPane tab={tab} phase={phase} stepIdx={stepIdx} poster={poster}
+              link={link} setLink={setLink} fileRef={fileRef} onFile={onFile}
+              useSample={useSample} runExtraction={runExtraction} />
+          </div>
+        )}
+
+        {/* FORM PANE */}
+        {(phase === "review" || phase === "done") && (
+          <div style={{ animation: "cp-fade-up .35s ease" }}>
+            {phase === "done" ? (
+              <SuccessCard form={form} onPublish={onPublish} />
+            ) : (
+              <ReviewForm form={form} set={set} conf={conf} clearConf={clearConf} lowCount={lowCount}
+                isAI={tab !== "manual"} onPublish={() => { onPublish(form); setPhase("done"); }} onCancel={onCancel} />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- input pane (dropzone / link / extraction) ---------------- */
+function InputPane({ tab, phase, stepIdx, poster, link, setLink, fileRef, onFile, useSample, runExtraction }) {
+  const showPoster = poster || phase !== "idle";
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: "var(--r-xl)", background: "var(--surface)",
+      padding: 16, boxShadow: "var(--shadow-sm)" }}>
+      {tab === "link" && phase === "idle" && (
+        <div>
+          <label style={lbl}>Event link</label>
+          <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="instagram.com/p/…  ·  unstop.com/…"
+            style={inp} />
+          <p style={{ fontSize: 12.5, color: "var(--text-3)", margin: "10px 2px 14px", lineHeight: 1.5 }}>
+            Paste an Instagram post, club page, or registration link. We'll read it and fill the form.
+          </p>
+          <Button variant="accent" full icon="sparkles" style={{ "--c": "var(--cat-cultural)" }}
+            onClick={runExtraction} disabled={!link.trim()}>Fetch details</Button>
+        </div>
+      )}
+
+      {tab === "upload" && phase === "idle" && (
+        <div>
+          <button onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "var(--cat-tech)"; }}
+            onDragLeave={(e) => (e.currentTarget.style.borderColor = "var(--border-strong)")}
+            onDrop={(e) => { e.preventDefault(); onFile(e.dataTransfer.files[0]); }}
+            style={{ width: "100%", padding: "38px 18px", borderRadius: "var(--r-lg)", cursor: "pointer",
+              border: "2px dashed var(--border-strong)", background: "var(--surface-2)", transition: "border-color .15s",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
+            <span style={{ width: 52, height: 52, borderRadius: "var(--r-lg)", display: "inline-flex",
+              alignItems: "center", justifyContent: "center", color: "#fff",
+              background: "linear-gradient(150deg, var(--cat-tech), var(--cat-cultural))" }}>
+              <Icon name="upload" size={24} /></span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>Drop a poster here</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-3)", marginTop: 3 }}>PNG, JPG or PDF · or click to browse</div>
+            </div>
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files[0])} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+            <span style={{ fontSize: 12, color: "var(--text-3)" }}>or</span>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          </div>
+          <Button variant="soft" full icon="sparkles" onClick={useSample}>Try a sample poster</Button>
+        </div>
+      )}
+
+      {showPoster && (
+        <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", border: "1px solid var(--border)" }}>
+          {poster ? (
+            <img src={poster.url} alt="poster" style={{ width: "100%", display: "block", maxHeight: 460, objectFit: "cover" }} />
+          ) : (
+            <PosterPlaceholder cat="cultural" label="music night poster" ratio="4 / 5" radius="0" style={{ border: "none" }} />
+          )}
+
+          {phase === "extracting" && <ExtractionOverlay stepIdx={stepIdx} />}
+
+          {phase === "review" && (
+            <div style={{ position: "absolute", top: 10, left: 10, display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "5px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, color: "#fff",
+              background: "color-mix(in srgb, var(--cat-sports) 92%, black)", boxShadow: "var(--shadow-md)" }}>
+              <Icon name="check" size={13} stroke={3} /> Extracted
+            </div>
+          )}
+        </div>
+      )}
+
+      {phase === "extracting" && <StepList stepIdx={stepIdx} />}
+    </div>
+  );
+}
+
+function ExtractionOverlay() {
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "color-mix(in srgb, var(--cat-cultural) 22%, rgba(5,7,13,.55))",
+      backdropFilter: "blur(1px)", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, height: 64,
+        background: "linear-gradient(180deg, transparent, color-mix(in srgb, var(--cat-tech) 80%, transparent), transparent)",
+        animation: "cp-scan 1.7s ease-in-out infinite" }} />
+      <style>{`@keyframes cp-scan { 0%{top:-64px} 100%{top:100%} }`}</style>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, color: "#fff" }}>
+          <span style={{ position: "relative", width: 46, height: 46 }}>
+            <span style={{ position: "absolute", inset: 0, borderRadius: 99, border: "2px solid rgba(255,255,255,.5)",
+              borderTopColor: "#fff", animation: "cp-spin .8s linear infinite" }} />
+            <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
+              <Icon name="sparkles" size={20} /></span>
+          </span>
+          <span className="mono" style={{ fontSize: 12, letterSpacing: "0.04em" }}>reading poster…</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+function StepList({ stepIdx }) {
+  return (
+    <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 9 }}>
+      {EXTRACT_STEPS.map((s, i) => {
+        const done = i < stepIdx, active = i === stepIdx;
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13,
+            fontWeight: 600, opacity: done || active ? 1 : 0.4, transition: "opacity .3s" }}>
+            <span style={{ width: 24, height: 24, borderRadius: 99, flex: "none", display: "inline-flex",
+              alignItems: "center", justifyContent: "center",
+              background: done ? "var(--cat-sports)" : active ? "var(--cat-cultural)" : "var(--surface-3)",
+              color: done || active ? "#fff" : "var(--text-3)" }}>
+              {done ? <Icon name="check" size={13} stroke={3} />
+                : active ? <span style={{ width: 8, height: 8, borderRadius: 99, background: "#fff", animation: "cp-fade .6s ease-in-out infinite alternate" }} />
+                : <Icon name={s.icon} size={12} />}
+            </span>
+            <span style={{ color: done ? "var(--text-2)" : "var(--text)" }}>{s.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+Object.assign(window, { SubmitScreen, EXTRACT_STEPS, SAMPLE_EXTRACTION, blankForm });
