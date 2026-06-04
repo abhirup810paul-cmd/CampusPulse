@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { EVENTS, CATEGORIES, SOURCES, TODAY } from '@/lib/data';
+import { fetchEvents, CATEGORIES, SOURCES, TODAY } from '@/lib/data';
 import { 
   ymd, sameDay, addDays, startOfWeek, timeToMin, monthMatrix, 
   fmtTime, fmtRange, DOW, MONTHS, useInteractions 
@@ -29,8 +29,17 @@ export function CalendarScreen({ isMobile }: { isMobile: boolean }) {
   const [anchor, setAnchor] = useState(new Date(TODAY));
   const [selected, setSelected] = useState<any>(null);
   const [sheet, setSheet] = useState(false);
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(() => EVENTS.filter((e) => eventMatches(e, f)), [f]);
+  useEffect(() => {
+    fetchEvents().then(data => {
+      setEvents(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const filtered = useMemo(() => events.filter((e) => eventMatches(e, f)), [events, f]);
   const monthLabel = `${MONTHS[anchor.getMonth()]} ${anchor.getFullYear()}`;
   const weekDays = useMemo(() => { const s = startOfWeek(anchor); return Array.from({ length: 7 }, (_, i) => addDays(s, i)); }, [anchor]);
 
@@ -86,7 +95,11 @@ export function CalendarScreen({ isMobile }: { isMobile: boolean }) {
             </div>
           )}
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={{ padding: "100px 0", textAlign: "center", color: "var(--text-3)", fontSize: 14 }}>
+              Loading events...
+            </div>
+          ) : filtered.length === 0 ? (
             <EmptyState onClear={() => setF({ cats: new Set(), sources: new Set(), price: "all", q: "" })} />
           ) : view === "month" ? (
             <MonthView anchor={anchor} events={filtered} store={store} onOpen={setSelected}

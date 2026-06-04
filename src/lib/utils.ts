@@ -53,16 +53,51 @@ export function useInteractions() {
     catch { return { rsvp: {}, stars: {} }; }
     return { rsvp: {}, stars: {} };
   });
+  
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
   }, [state]);
 
-  const setRsvp = (id: string, val: string) => setState((s: any) => ({ ...s, rsvp: { ...s.rsvp, [id]: s.rsvp[id] === val ? null : val } }));
-  const toggleStar = (id: string) => setState((s: any) => ({ ...s, stars: { ...s.stars, [id]: !s.stars[id] } }));
+  const syncInteraction = async (itemId: string, type: string, value: string | null) => {
+    const { supabase } = await import('./supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      if (value === null) {
+        // delete
+        await supabase.from('user_interactions').delete()
+          .match({ user_id: session.user.id, item_id: itemId, type });
+      } else {
+        // upsert
+        await supabase.from('user_interactions').upsert({
+          id: `${session.user.id}-${itemId}-${type}`,
+          user_id: session.user.id,
+          item_id: itemId,
+          type,
+          value
+        }, { onConflict: 'user_id,item_id,type' });
+      }
+    }
+  };
+
+  const setRsvp = (id: string, val: string) => {
+    setState((s: any) => {
+      const newVal = s.rsvp[id] === val ? null : val;
+      syncInteraction(id, 'rsvp', newVal);
+      return { ...s, rsvp: { ...s.rsvp, [id]: newVal } };
+    });
+  };
+  
+  const toggleStar = (id: string) => {
+    setState((s: any) => {
+      const newVal = !s.stars[id];
+      syncInteraction(id, 'star', newVal ? 'true' : null);
+      return { ...s, stars: { ...s.stars, [id]: newVal } };
+    });
+  };
 
   const goingCount = (ev: any) => ev.going + (state.rsvp[ev.id] === "going" ? 1 : 0);
   const interestedCount = (ev: any) => ev.interested + (state.rsvp[ev.id] === "interested" ? 1 : 0);
-  const starCount = (ev: any) => ev.stars + (state.stars[ev.id] ? 1 : 0);
+  const starCount = (ev: any) => (ev.stars || 0) + (state.stars[ev.id] ? 1 : 0);
 
   return { state, setRsvp, toggleStar, goingCount, interestedCount, starCount };
 }

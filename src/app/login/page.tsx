@@ -8,9 +8,19 @@ import { Icon, Button, Logo } from '@/components/ui/core';
 export default function LoginScreen() {
   const router = useRouter();
 
-  const handleMicrosoftLogin = () => {
-    // Redirect to home/calendar page on successful "login" for now
-    router.push('/');
+  const handleMicrosoftLogin = async () => {
+    const { supabase } = await import('@/lib/supabase');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        scopes: 'email profile',
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    if (error) {
+      console.error('Error logging in:', error);
+      alert('Failed to log in with Microsoft. Check console for details.');
+    }
   };
 
   return (

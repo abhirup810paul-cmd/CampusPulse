@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FEED, avatar } from '@/lib/data';
+import { fetchPosts, avatar } from '@/lib/data';
 import { useInteractions } from '@/lib/utils';
 import { Icon, Avatar, SegmentedControl, CategoryBadge, Badge } from '@/components/ui/core';
 
@@ -11,13 +11,34 @@ export default function CommunityPage() {
   const store = useInteractions();
   const [sort, setSort] = useState("trending");
   
+  const [feed, setFeed] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPosts().then(data => {
+      const mapped = data.map((p: any) => ({
+        id: p.id,
+        title: "", // Posts in DB don't have titles yet
+        body: p.body,
+        by: p.author_name,
+        when: p.time,
+        cat: "social",
+        trending: p.trending,
+        stars: p.upvotes,
+        going: 0
+      }));
+      setFeed(mapped);
+      setLoading(false);
+    });
+  }, []);
+  
   const items = useMemo(() => {
-    const arr = [...FEED];
+    const arr = [...feed];
     if (sort === "trending") arr.sort((a, b) => ((b.trending ? 1 : 0) - (a.trending ? 1 : 0)) || (store.starCount(b) - store.starCount(a)));
     return arr;
-  }, [sort, store.state]);
+  }, [sort, store.state, feed]);
   
-  const trending = FEED.filter((f) => f.trending);
+  const trending = feed.filter((f) => f.trending);
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "8px 4px 48px" }}>
@@ -53,7 +74,13 @@ export default function CommunityPage() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {items.map((f) => <FeedCard key={f.id} item={f} store={store} />)}
+        {loading ? (
+          <div style={{ padding: "100px 0", textAlign: "center", color: "var(--text-3)", fontSize: 14 }}>
+            Loading posts...
+          </div>
+        ) : (
+          items.map((f) => <FeedCard key={f.id} item={f} store={store} />)
+        )}
       </div>
     </div>
   );
@@ -83,8 +110,8 @@ function FeedCard({ item, store }: any) {
         {item.trending && <Badge tone="trending" icon="flame" size="sm">Hot</Badge>}
       </div>
 
-      <h3 style={{ margin: "0 0 6px", fontSize: 16.5, fontWeight: 700, lineHeight: 1.25 }}>{item.title}</h3>
-      <p style={{ margin: "0 0 14px", fontSize: 14, lineHeight: 1.55, color: "var(--text-2)" }}>{item.body}</p>
+      {item.title && <h3 style={{ margin: "0 0 6px", fontSize: 16.5, fontWeight: 700, lineHeight: 1.25 }}>{item.title}</h3>}
+      <p style={{ margin: "0 0 14px", fontSize: 14, lineHeight: 1.55, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>{item.body}</p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={() => store.toggleStar(item.id)} style={{

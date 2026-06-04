@@ -9,7 +9,7 @@ CREATE TABLE public.events (
     start TEXT NOT NULL, -- Format: HH:MM
     "end" TEXT,          -- Format: HH:MM
     venue TEXT NOT NULL,
-    desc TEXT,
+    description TEXT,
     cat TEXT NOT NULL,   -- e.g. 'tech', 'cultural', 'academic'
     source TEXT NOT NULL, -- e.g. 'official', 'club', 'student'
     price TEXT,

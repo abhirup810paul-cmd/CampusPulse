@@ -72,6 +72,43 @@ export function SubmitScreen() {
     if (t === "manual") startManual();
   };
 
+  const handlePublish = async () => {
+    const { supabase } = await import('@/lib/supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      alert("You must be signed in to post an event.");
+      router.push('/login');
+      return;
+    }
+
+    const newId = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).slice(2, 6);
+    
+    const { error } = await supabase.from('events').insert({
+      id: newId,
+      title: form.title,
+      cat: form.cat || 'social',
+      source: 'community',
+      free: form.free,
+      date: form.date,
+      start: form.start,
+      end: form.end,
+      venue: form.venue,
+      description: form.desc,
+      price: form.price,
+      going: 0,
+      interested: 0,
+      stars: 0,
+    });
+
+    if (error) {
+      console.error(error);
+      alert("Failed to submit event: " + error.message);
+    } else {
+      setPhase("done");
+    }
+  };
+
   const lowCount = Object.keys(conf).length;
 
   return (
@@ -106,7 +143,7 @@ export function SubmitScreen() {
               <SuccessCard form={form} onPublish={(arg: string) => arg === "goto" ? router.push('/') : null} />
             ) : (
               <ReviewForm form={form} set={set} conf={conf} clearConf={clearConf} lowCount={lowCount}
-                isAI={tab !== "manual"} onPublish={() => setPhase("done")} onCancel={() => router.push('/')} />
+                isAI={tab !== "manual"} onPublish={handlePublish} onCancel={() => router.push('/')} />
             )}
           </div>
         )}
