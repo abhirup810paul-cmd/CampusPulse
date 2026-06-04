@@ -91,7 +91,6 @@ export function useInteractions() {
       } else {
         // upsert
         await supabase.from('user_interactions').upsert({
-          id: `${session.user.id}-${itemId}-${type}`,
           user_id: session.user.id,
           item_id: itemId,
           type,
